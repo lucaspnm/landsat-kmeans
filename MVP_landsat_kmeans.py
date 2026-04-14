@@ -65,6 +65,15 @@ red   = scale_reflectance(red_dn)
 nir   = scale_reflectance(nir_dn)
 swir1 = scale_reflectance(swir1_dn)
 
+# ----------------------------
+# Optional spatial downsampling
+# ----------------------------
+DOWNSAMPLE = 4   # try 2 or 4
+
+green = green[::DOWNSAMPLE, ::DOWNSAMPLE]
+red   = red[::DOWNSAMPLE, ::DOWNSAMPLE]
+nir   = nir[::DOWNSAMPLE, ::DOWNSAMPLE]
+swir1 = swir1[::DOWNSAMPLE, ::DOWNSAMPLE]
 
 # ----------------------------
 # DEBUG: Plot the four bands
@@ -162,11 +171,30 @@ K = 5
 kmeans = KMeans(n_clusters=K, random_state=0, n_init=10)
 kmeans.fit(X_train)
 
-labels_train = kmeans.predict(X_train)
+# Predict labels for all valid pixels in the downsampled image
+labels_valid = kmeans.predict(X_valid)
+
+# Rebuild classified image
+label_image = np.full(X.shape[0], -1, dtype=np.int32)
+label_image[valid_mask] = labels_valid
+label_image = label_image.reshape(rows, cols)
 
 # ----------------------------
-# 12) Plot feature-space diagnostic
+# 12) Plot classified land cover image
 # ----------------------------
+plt.figure(figsize=(8, 6))
+plt.imshow(label_image, cmap="tab10")
+plt.colorbar(label="Cluster")
+plt.title("K-means Classified Land Cover Map")
+plt.axis("off")
+plt.tight_layout()
+plt.show()
+
+# ----------------------------
+# 13) Plot feature-space diagnostic
+# ----------------------------
+labels_train = kmeans.predict(X_train)
+
 plt.figure(figsize=(6, 5))
 plt.scatter(
     X_train[:, 1],
@@ -182,7 +210,7 @@ plt.tight_layout()
 plt.show()
 
 # ----------------------------
-# 13) Print cluster means
+# 14) Print cluster means
 # ----------------------------
 feature_names = ["green", "red", "nir", "swir1", "ndvi", "ndwi", "ndbi"]
 
@@ -196,4 +224,3 @@ for i in range(K):
     print(f"\nCluster {i}:")
     for name, val in zip(feature_names, cluster_mean):
         print(f"  {name:>6s}: {val: .4f}")
-# %%
