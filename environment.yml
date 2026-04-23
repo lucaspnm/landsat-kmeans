@@ -1,0 +1,45 @@
+# -------------------------------------------------------
+#  conda environment definition for the K‑means / rasterio
+#  demo (numpy, matplotlib, scikit‑learn, rasterio)
+# -------------------------------------------------------
+name: kmeans-rasterio-env          # <-- change the name if you wish
+
+channels:
+  - conda-forge                     # highest priority – provides up‑to‑date GIS stack
+  - defaults                        # fallback (optional)
+
+dependencies:
+  # ---------- Python ----------
+  - python=3.12.7                   # any 3.x version you need; 3.11 is current stable
+
+  # ---------- Core scientific libraries ----------
+  - numpy                           # array handling
+  - matplotlib                      # includes pyplot, patches, etc.
+  - scikit-learn                    # KMeans and other ML tools
+  - rasterio                        # GeoTIFF / raster IO (pulls matching GDAL, PROJ, etc.)
+
+  # ---------- Frequently‑used companions (optional) ----------
+  # If you plan to do any data‐frame work, plotting, or GIS analysis,
+  # these are handy but not strictly required for the imports shown.
+  - pandas
+  - geopandas
+  - tqdm                            # nice progress bars for loops
+  - joblib                          # used by scikit‑learn for parallelism
+
+  # ---------- Development helpers ----------
+  - ipython                         # interactive console / Jupyter‑like REPL
+  - jupyterlab                      # if you want notebooks
+  - pip                             # keep pip available for any pip‑only packages
+
+  # ---------- Example of a pip‑only package (uncomment if needed) ----------
+  # - pip:
+  #   - some‑pip‑only‑library
+
+# -------------------------------------------------------
+# To create the environment:
+#   conda env create -f environment.yml
+#   (or: mamba env create -f environment.yml for a faster solve)
+#
+# Activate it with:
+#   conda activate kmeans-rasterio-env
+# -------------------------------------------------------
