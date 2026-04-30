@@ -5,11 +5,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 import rasterio
+from rasterio.warp import reproject, Resampling
 
+# Paths and parameters
 GREEN_PATH = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B3.TIF"
 RED_PATH   = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B4.TIF"
 NIR_PATH   = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B5.TIF"
 SWIR1_PATH = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B6.TIF"
+NLCD_PATH  = "Annual_NLCD_LndCov_2024_CU_C1V1.tif"
 
 OUTPUT_DIR = "results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -18,12 +21,33 @@ K_VALUES = [2, 3, 4, 5, 6]
 MAX_SAMPLES = 20000
 RANDOM_SEED = 0
 
-# Set to None for full resolution, or use 2/4 for faster testing
-DOWNSAMPLE = None
+
+# Helper functions
+def align_nlcd_to_landsat(nlcd_path, landsat_profile, dst_shape):
+    """
+    Reproject NLCD to match the Landsat grid.
+    Returns aligned NLCD as a NumPy array.
+    """
+    nlcd_aligned = np.zeros(dst_shape, dtype=np.int16)
+
+    with rasterio.open(nlcd_path) as src:
+        reproject(
+            source=rasterio.band(src, 1),
+            destination=nlcd_aligned,
+            src_transform=src.transform,
+            src_crs=src.crs,
+            dst_transform=landsat_profile["transform"],
+            dst_crs=landsat_profile["crs"],
+            resampling=Resampling.nearest
+        )
+
+    return nlcd_aligned
 
 def read_band(path):
     with rasterio.open(path) as src:
-        return src.read(1).astype(np.float32)
+        band = src.read(1).astype(np.float32)
+        profile = src.profile
+        return band, profile
 
 def scale_reflectance(dn):
     return dn * 0.0000275 - 0.2
@@ -54,21 +78,50 @@ def save_false_color(nir, red, green):
     plt.savefig(os.path.join(OUTPUT_DIR, "false_color_composite.png"), dpi=300)
     plt.close()
 
-# Load bands
-green = scale_reflectance(read_band(GREEN_PATH))
-red   = scale_reflectance(read_band(RED_PATH))
-nir   = scale_reflectance(read_band(NIR_PATH))
-swir1 = scale_reflectance(read_band(SWIR1_PATH))
+def save_overlay(false_color, nlcd_aligned, out_path):
+    plt.figure(figsize=(12, 10))
+    plt.imshow(false_color)
+    plt.imshow(nlcd_aligned, cmap="tab20", alpha=0.35)
+    plt.title("NLCD Overlay on Landsat")
+    plt.axis("off")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=300)
+    plt.close()
 
-if DOWNSAMPLE is not None:
-    green = green[::DOWNSAMPLE, ::DOWNSAMPLE]
-    red   = red[::DOWNSAMPLE, ::DOWNSAMPLE]
-    nir   = nir[::DOWNSAMPLE, ::DOWNSAMPLE]
-    swir1 = swir1[::DOWNSAMPLE, ::DOWNSAMPLE]
+# Load bands
+green, green_profile = read_band(GREEN_PATH)
+red, red_profile = read_band(RED_PATH)
+nir, nir_profile = read_band(NIR_PATH)
+swir1, swir1_profile = read_band(SWIR1_PATH)
+
+green = scale_reflectance(green)
+red = scale_reflectance(red)
+nir = scale_reflectance(nir)
+swir1 = scale_reflectance(swir1)
+
+
+# Align NLCD
+nlcd_aligned = align_nlcd_to_landsat(
+    NLCD_PATH,
+    green_profile,
+    dst_shape=green.shape
+)
+
 
 print("Image shape:", green.shape)
 
 save_false_color(nir, red, green)
+
+false_color = np.stack([
+    normalize_for_display(nir),
+    normalize_for_display(red),
+    normalize_for_display(green)
+    ], axis=-1)
+
+save_overlay(false_color, 
+             nlcd_aligned, 
+             os.path.join(OUTPUT_DIR, "nlcd_overlay.png"))
+
 
 # Compute indices
 ndvi = normalized_difference(nir, red)
