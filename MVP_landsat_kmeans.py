@@ -3,6 +3,8 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.colors import ListedColormap, BoundaryNorm
 from sklearn.cluster import KMeans
 import rasterio
 from rasterio.warp import reproject, Resampling
@@ -20,7 +22,7 @@ OUTPUT_DIR = "results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # K_VALUES = [2, 3, 4, 5, 6]
-K_VALUES = [4]
+K_VALUES = [5]
 MAX_SAMPLES = 20000
 RANDOM_SEED = 0
 
@@ -169,12 +171,39 @@ for K in K_VALUES:
     label_image[valid_mask] = labels_valid
     label_image = label_image.reshape(rows, cols)
 
-    # Save cluster map with cluster IDs only
+    # Save cluster map with legend
+    cluster_colors = [
+        "black",      # -1 background / invalid
+        "tab:blue",   # cluster 0
+        "tab:red",    # cluster 1
+        "tab:green",  # cluster 2
+        "tab:cyan",   # cluster 3
+        "tab:orange", # cluster 4 if K=5
+    ]
+
+    cmap = ListedColormap(cluster_colors[:K + 1])
+    bounds = np.arange(-1.5, K + 0.5, 1)
+    norm = BoundaryNorm(bounds, cmap.N)
+    
     plt.figure(figsize=(12, 10))
-    plt.imshow(label_image, cmap="tab10")
-    plt.colorbar(label="Cluster ID")
+    img = plt.imshow(label_image, cmap=cmap, norm=norm)
     plt.title(f"K-means Cluster Map, K = {K}")
     plt.axis("off")
+
+    # Build legend 
+    legend_patches = [
+        mpatches.Patch(color="black", label="Background / invalid")
+    ]
+
+    for cluster_id in range(K):
+        legend_patches.append(
+            mpatches.Patch(
+                color=cluster_colors[cluster_id + 1], 
+                label=f"Cluster {cluster_id}"
+            )
+        )
+    
+    plt.legend(handles=legend_patches, loc="lower right")
     plt.tight_layout()
     plt.savefig(os.path.join(OUTPUT_DIR, f"k{K}_cluster_map.png"), dpi=300)
     plt.close()
@@ -217,14 +246,10 @@ def map_nlcd_to_superclass(nlcd_array):
 
 NLCD_GROUPS = {
     11: "water",
-
     21: "urban", 22: "urban", 23: "urban", 24: "urban",
-
     31: "barren",
-
     41: "vegetation", 42: "vegetation", 43: "vegetation",
     52: "vegetation", 71: "vegetation",
-
     81: "agriculture", 82: "agriculture"
 }
 
@@ -262,3 +287,40 @@ accuracy = np.mean(
 )
 
 print(f"\nAccuracy vs NLCD (superclasses): {accuracy:.4f}")
+
+CLASS_COLORS = {
+    "water": [0, 0, 255],         # blue
+    "urban": [255, 0, 0],         # red
+    "vegetation": [0, 200, 0],    # green
+    "barren": [210, 180, 140],    # tan
+    #"agriculture": [255, 255, 0], # yellow (optional)
+    "unknown": [0, 0, 0]          # black
+}
+
+# Create RGB image
+rgb_image = np.zeros((rows, cols, 3), dtype=np.uint8)
+
+# Fill it
+for cluster_id, class_name in cluster_to_class.items():
+    mask = (label_image == cluster_id)
+    rgb_image[mask] = CLASS_COLORS[class_name]
+
+plt.figure(figsize=(12, 10))
+plt.imshow(rgb_image)
+plt.title("K-means Land Cover Classification (K=4)")
+plt.axis("off")
+
+# Build legend dynamically
+legend_patches = []
+used_classes = set(cluster_to_class.values())
+
+for class_name in used_classes:
+    color = np.array(CLASS_COLORS[class_name]) / 255.0
+    patch = mpatches.Patch(color=color, label=class_name)
+    legend_patches.append(patch)
+
+plt.legend(handles=legend_patches, loc="lower right")
+
+plt.tight_layout()
+plt.savefig(os.path.join(OUTPUT_DIR, "k4_labeled_map.png"), dpi=300)
+plt.close()
