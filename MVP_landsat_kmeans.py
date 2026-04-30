@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 import rasterio
 from rasterio.warp import reproject, Resampling
+from collections import Counter
+
 
 # Paths and parameters
 GREEN_PATH = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B3.TIF"
@@ -17,10 +19,10 @@ NLCD_PATH  = "Annual_NLCD_LndCov_2024_CU_C1V1.tif"
 OUTPUT_DIR = "results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-K_VALUES = [2, 3, 4, 5, 6]
+# K_VALUES = [2, 3, 4, 5, 6]
+K_VALUES = [4]
 MAX_SAMPLES = 20000
 RANDOM_SEED = 0
-
 
 # Helper functions
 def align_nlcd_to_landsat(nlcd_path, landsat_profile, dst_shape):
@@ -98,7 +100,6 @@ green = scale_reflectance(green)
 red = scale_reflectance(red)
 nir = scale_reflectance(nir)
 swir1 = scale_reflectance(swir1)
-
 
 # Align NLCD
 nlcd_aligned = align_nlcd_to_landsat(
@@ -204,4 +205,60 @@ for K in K_VALUES:
         for name, val in zip(feature_names, cluster_mean):
             print(f"  {name:>6s}: {val: .4f}")
 
-print(f"\nDone. Figures saved in: {OUTPUT_DIR}")
+
+# Analysis of NLCD classes in each cluster
+def map_nlcd_to_superclass(nlcd_array):
+    mapped = np.zeros_like(nlcd_array, dtype=object)
+
+    for k, v in NLCD_GROUPS.items():
+        mapped[nlcd_array == k] = v
+
+    return mapped
+
+NLCD_GROUPS = {
+    11: "water",
+
+    21: "urban", 22: "urban", 23: "urban", 24: "urban",
+
+    31: "barren",
+
+    41: "vegetation", 42: "vegetation", 43: "vegetation",
+    52: "vegetation", 71: "vegetation",
+
+    81: "agriculture", 82: "agriculture"
+}
+
+# Flatten NLCD and align with valid pixels
+nlcd_flat = nlcd_aligned.reshape(-1)
+nlcd_valid = nlcd_flat[valid_mask]
+nlcd_super = map_nlcd_to_superclass(nlcd_valid)
+
+cluster_to_class = {}
+
+for cluster_id in range(K):
+    pixels = nlcd_super[labels_valid == cluster_id]
+
+    # remove empty / invalid
+    pixels = pixels[pixels != 0]
+
+    if len(pixels) == 0:
+        continue
+
+    most_common = Counter(pixels).most_common(1)[0][0]
+    cluster_to_class[cluster_id] = most_common
+
+print("\nCluster → NLCD superclass mapping:")
+for k, v in cluster_to_class.items():
+    print(f"Cluster {k} → {v}")
+
+predicted_classes = np.array([
+    cluster_to_class.get(c, "unknown") for c in labels_valid
+])
+
+valid_eval = predicted_classes != "unknown"
+
+accuracy = np.mean(
+    predicted_classes[valid_eval] == nlcd_super[valid_eval]
+)
+
+print(f"\nAccuracy vs NLCD (superclasses): {accuracy:.4f}")
