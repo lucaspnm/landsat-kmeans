@@ -245,11 +245,11 @@ def map_nlcd_to_superclass(nlcd_array):
     return mapped
 
 NLCD_GROUPS = {
-    11: "water",
+    11: "water", 12: "water",
     21: "urban", 22: "urban", 23: "urban", 24: "urban",
     31: "barren",
     41: "vegetation", 42: "vegetation", 43: "vegetation",
-    52: "vegetation", 71: "vegetation",
+    52: "vegetation", 71: "vegetation", 90: "vegetation", 95: "vegetation",
     81: "agriculture", 82: "agriculture"
 }
 
@@ -258,7 +258,31 @@ nlcd_flat = nlcd_aligned.reshape(-1)
 nlcd_valid = nlcd_flat[valid_mask]
 nlcd_super = map_nlcd_to_superclass(nlcd_valid)
 
+eval_classes = ["water", "urban", "barren", "vegetation", "agriculture"]
+eval_mask = np.isin(nlcd_super, eval_classes)
+
+labels_eval = labels_valid[eval_mask]
+nlcd_eval = nlcd_super[eval_mask]
+
+
+
 cluster_to_class = {}
+
+for cluster_id in range(K):
+    true_labels_in_cluster = nlcd_eval[labels_eval == cluster_id]
+
+    if len(true_labels_in_cluster) == 0:
+        cluster_to_class[cluster_id] = "unknown"
+        continue
+
+    counts = Counter(true_labels_in_cluster)
+    majority_class = counts.most_common(1)[0][0]
+
+    cluster_to_class[cluster_id] = majority_class
+
+print("\nCluster labels:")
+for cluster_id, class_name in cluster_to_class.items():
+    print(f"Cluster {cluster_id} -> {class_name}")
 
 for cluster_id in range(K):
     pixels = nlcd_super[labels_valid == cluster_id]
