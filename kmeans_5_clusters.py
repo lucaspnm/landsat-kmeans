@@ -1,5 +1,3 @@
-# landsat_kmeans_sweep_simple.py
-
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,8 +19,7 @@ NLCD_PATH  = "Annual_NLCD_LndCov_2024_CU_C1V1.tif"
 OUTPUT_DIR = "results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# K_VALUES = [2, 3, 4, 5, 6]
-K_VALUES = [5]
+K = 5
 MAX_SAMPLES = 20000
 RANDOM_SEED = 0
 
@@ -92,6 +89,14 @@ def save_overlay(false_color, nlcd_aligned, out_path):
     plt.savefig(out_path, dpi=300)
     plt.close()
 
+def map_nlcd_to_superclass(nlcd_array):
+    mapped = np.zeros_like(nlcd_array, dtype=object)
+
+    for key, val in NLCD_GROUPS.items():
+        mapped[nlcd_array == key] = val
+
+    return mapped
+
 # Load bands
 green, green_profile = read_band(GREEN_PATH)
 red, red_profile = read_band(RED_PATH)
@@ -160,96 +165,90 @@ print("Training samples:", X_train.shape[0])
 
 feature_names = ["green", "red", "nir", "swir1", "ndvi", "ndwi", "ndbi"]
 
-for K in K_VALUES:
-    print(f"\nRunning K = {K}")
 
-    kmeans = KMeans(n_clusters=K, random_state=RANDOM_SEED, n_init=10)
-    labels_train = kmeans.fit_predict(X_train)
-    labels_valid = kmeans.predict(X_valid)
+print(f"\nRunning K = 5")
 
-    label_image = np.full(X.shape[0], -1, dtype=np.int32)
-    label_image[valid_mask] = labels_valid
-    label_image = label_image.reshape(rows, cols)
+kmeans = KMeans(n_clusters=K, random_state=RANDOM_SEED, n_init=10)
+labels_train = kmeans.fit_predict(X_train)
+labels_valid = kmeans.predict(X_valid)
 
-    # Save cluster map with legend
-    cluster_colors = [
-        "black",      # -1 background / invalid
-        "tab:blue",   # cluster 0
-        "tab:red",    # cluster 1
-        "tab:green",  # cluster 2
-        "tab:cyan",   # cluster 3
-        "tab:orange", # cluster 4 if K=5
-    ]
+label_image = np.full(X.shape[0], -1, dtype=np.int32)
+label_image[valid_mask] = labels_valid
+label_image = label_image.reshape(rows, cols)
 
-    cmap = ListedColormap(cluster_colors[:K + 1])
-    bounds = np.arange(-1.5, K + 0.5, 1)
-    norm = BoundaryNorm(bounds, cmap.N)
-    
-    plt.figure(figsize=(12, 10))
-    img = plt.imshow(label_image, cmap=cmap, norm=norm)
-    plt.title(f"K-means Cluster Map, K = {K}")
-    plt.axis("off")
+# Save cluster map with legend
+cluster_colors = [
+    "black",      # -1 background / invalid
+    "tab:blue",   # cluster 0
+    "tab:red",    # cluster 1
+    "tab:green",  # cluster 2
+    "tab:cyan",   # cluster 3
+    "tab:orange", # cluster 4 if K=5
+]
 
-    # Build legend 
-    legend_patches = [
-        mpatches.Patch(color="black", label="Background / invalid")
-    ]
+cmap = ListedColormap(cluster_colors[:K + 1])
+bounds = np.arange(-1.5, K + 0.5, 1)
+norm = BoundaryNorm(bounds, cmap.N)
 
-    for cluster_id in range(K):
-        legend_patches.append(
-            mpatches.Patch(
-                color=cluster_colors[cluster_id + 1], 
-                label=f"Cluster {cluster_id}"
-            )
+plt.figure(figsize=(12, 10))
+img = plt.imshow(label_image, cmap=cmap, norm=norm)
+plt.title(f"K-means Cluster Map, K = {K}")
+plt.axis("off")
+
+# Build legend 
+legend_patches = [
+    mpatches.Patch(color="black", label="Background / invalid")
+]
+
+for cluster_id in range(K):
+    legend_patches.append(
+        mpatches.Patch(
+            color=cluster_colors[cluster_id + 1], 
+            label=f"Cluster {cluster_id}"
         )
-    
-    plt.legend(handles=legend_patches, loc="lower right")
-    plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, f"k{K}_cluster_map.png"), dpi=300)
-    plt.close()
-
-    # Save feature-space scatter
-    plt.figure(figsize=(8, 6))
-    plt.scatter(
-        X_train[:, 1],
-        X_train[:, 2],
-        c=labels_train,
-        s=4,
-        cmap="tab10"
     )
-    plt.xlabel("Red Reflectance")
-    plt.ylabel("NIR Reflectance")
-    plt.title(f"Red-NIR Feature Space, K = {K}")
-    plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, f"k{K}_red_nir_scatter.png"), dpi=300)
-    plt.close()
 
-    # Print cluster means for interpretation
-    print(f"Cluster means for K = {K}:")
-    for cluster_id in range(K):
-        cluster_pixels = X_train[labels_train == cluster_id]
-        cluster_mean = cluster_pixels.mean(axis=0)
+plt.legend(handles=legend_patches, loc="lower right")
+plt.tight_layout()
+plt.savefig(os.path.join(OUTPUT_DIR, f"k{K}_cluster_map.png"), dpi=300)
+plt.close()
 
-        print(f"\nCluster {cluster_id}:")
-        for name, val in zip(feature_names, cluster_mean):
-            print(f"  {name:>6s}: {val: .4f}")
+# Save feature-space scatter
+plt.figure(figsize=(8, 6))
+plt.scatter(
+    X_train[:, 1],
+    X_train[:, 2],
+    c=labels_train,
+    s=4,
+    cmap="tab10"
+)
+plt.xlabel("Red Reflectance")
+plt.ylabel("NIR Reflectance")
+plt.title(f"Red-NIR Feature Space, K = {K}")
+plt.tight_layout()
+plt.savefig(os.path.join(OUTPUT_DIR, f"k{K}_red_nir_scatter.png"), dpi=300)
+plt.close()
+
+# Print cluster means for interpretation
+print(f"Cluster means for K = {K}:")
+for cluster_id in range(K):
+    cluster_pixels = X_train[labels_train == cluster_id]
+    cluster_mean = cluster_pixels.mean(axis=0)
+
+    print(f"\nCluster {cluster_id}:")
+    for name, val in zip(feature_names, cluster_mean):
+        print(f"  {name:>6s}: {val: .4f}")
 
 
 # Analysis of NLCD classes in each cluster
-def map_nlcd_to_superclass(nlcd_array):
-    mapped = np.zeros_like(nlcd_array, dtype=object)
-
-    for k, v in NLCD_GROUPS.items():
-        mapped[nlcd_array == k] = v
-
-    return mapped
 
 NLCD_GROUPS = {
     11: "water", 12: "water",
     21: "urban", 22: "urban", 23: "urban", 24: "urban",
     31: "barren",
     41: "vegetation", 42: "vegetation", 43: "vegetation",
-    52: "vegetation", 71: "vegetation", 90: "vegetation", 95: "vegetation",
+    52: "vegetation", 71: "vegetation", 
+    90: "vegetation", 95: "vegetation", # wetlands mapped to vegetation
     81: "agriculture", 82: "agriculture"
 }
 
@@ -263,8 +262,6 @@ eval_mask = np.isin(nlcd_super, eval_classes)
 
 labels_eval = labels_valid[eval_mask]
 nlcd_eval = nlcd_super[eval_mask]
-
-
 
 cluster_to_class = {}
 
@@ -284,22 +281,6 @@ print("\nCluster labels:")
 for cluster_id, class_name in cluster_to_class.items():
     print(f"Cluster {cluster_id} -> {class_name}")
 
-for cluster_id in range(K):
-    pixels = nlcd_super[labels_valid == cluster_id]
-
-    # remove empty / invalid
-    pixels = pixels[pixels != 0]
-
-    if len(pixels) == 0:
-        continue
-
-    most_common = Counter(pixels).most_common(1)[0][0]
-    cluster_to_class[cluster_id] = most_common
-
-print("\nCluster → NLCD superclass mapping:")
-for k, v in cluster_to_class.items():
-    print(f"Cluster {k} → {v}")
-
 predicted_classes = np.array([
     cluster_to_class.get(c, "unknown") for c in labels_valid
 ])
@@ -317,7 +298,7 @@ CLASS_COLORS = {
     "urban": [255, 0, 0],         # red
     "vegetation": [0, 200, 0],    # green
     "barren": [210, 180, 140],    # tan
-    #"agriculture": [255, 255, 0], # yellow (optional)
+    "agriculture": [255, 255, 0], # yellow (optional)
     "unknown": [0, 0, 0]          # black
 }
 
@@ -331,7 +312,7 @@ for cluster_id, class_name in cluster_to_class.items():
 
 plt.figure(figsize=(12, 10))
 plt.imshow(rgb_image)
-plt.title("K-means Land Cover Classification (K=4)")
+plt.title("K-means Land Cover Classification (K=5)")
 plt.axis("off")
 
 # Build legend dynamically
@@ -344,7 +325,6 @@ for class_name in used_classes:
     legend_patches.append(patch)
 
 plt.legend(handles=legend_patches, loc="lower right")
-
 plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "k4_labeled_map.png"), dpi=300)
+plt.savefig(os.path.join(OUTPUT_DIR, "NLCD_k5_labeled_map.png"), dpi=300)
 plt.close()
