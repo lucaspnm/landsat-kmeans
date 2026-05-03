@@ -243,7 +243,8 @@ for cluster_id in range(K):
 
 NLCD_GROUPS = {
     11: "water", 12: "water",
-    21: "urban", 22: "urban", 23: "urban", 24: "urban",
+    21: "urban - low intensity", 22: "urban - low intensity", 
+    23: "urban", 24: "urban",
     31: "barren",
     41: "vegetation", 42: "vegetation", 43: "vegetation",
     52: "vegetation", 71: "vegetation", 
@@ -256,7 +257,7 @@ nlcd_flat = nlcd_aligned.reshape(-1)
 nlcd_valid = nlcd_flat[valid_mask]
 nlcd_super = map_nlcd_to_superclass(nlcd_valid)
 
-eval_classes = ["water", "urban", "barren", "vegetation", "agriculture"]
+eval_classes = ["urban - low intensity", "urban", "barren", "vegetation", "agriculture"]
 eval_mask = np.isin(nlcd_super, eval_classes)
 
 labels_eval = labels_valid[eval_mask]
@@ -278,7 +279,7 @@ predicted_classes = np.array([
 ])
 
 # Only evaluate valid NLCD classes
-valid_eval = np.isin(nlcd_super, ["water", "urban", "barren", "vegetation", "agriculture"])
+valid_eval = np.isin(nlcd_super, eval_classes)
 
 accuracy = np.mean(
     predicted_classes[valid_eval] == nlcd_super[valid_eval]
@@ -287,7 +288,7 @@ accuracy = np.mean(
 print(f"\nManual mapping accuracy: {accuracy:.4f}")
 
 CLASS_COLORS = {
-    "water": [0, 0, 255],         # blue
+    "urban - low intensity": [0, 0, 255],         # blue
     "urban": [255, 0, 0],         # red
     "vegetation": [0, 200, 0],    # green
     "barren": [210, 180, 140],    # tan
