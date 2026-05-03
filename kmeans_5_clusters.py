@@ -8,7 +8,6 @@ import rasterio
 from rasterio.warp import reproject, Resampling
 from collections import Counter
 
-
 # Paths and parameters
 GREEN_PATH = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B3.TIF"
 RED_PATH   = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B4.TIF"
@@ -265,33 +264,27 @@ nlcd_eval = nlcd_super[eval_mask]
 
 cluster_to_class = {}
 
-for cluster_id in range(K):
-    true_labels_in_cluster = nlcd_eval[labels_eval == cluster_id]
+cluster_to_class = {
+    0: "barren",
+    1: "urban",
+    2: "vegetation",
+    3: "barren",
+    4: "agriculture",
+}
 
-    if len(true_labels_in_cluster) == 0:
-        cluster_to_class[cluster_id] = "unknown"
-        continue
-
-    counts = Counter(true_labels_in_cluster)
-    majority_class = counts.most_common(1)[0][0]
-
-    cluster_to_class[cluster_id] = majority_class
-
-print("\nCluster labels:")
-for cluster_id, class_name in cluster_to_class.items():
-    print(f"Cluster {cluster_id} -> {class_name}")
-
+# Convert clusters → predicted classes
 predicted_classes = np.array([
     cluster_to_class.get(c, "unknown") for c in labels_valid
 ])
 
-valid_eval = predicted_classes != "unknown"
+# Only evaluate valid NLCD classes
+valid_eval = np.isin(nlcd_super, ["water", "urban", "barren", "vegetation", "agriculture"])
 
 accuracy = np.mean(
     predicted_classes[valid_eval] == nlcd_super[valid_eval]
 )
 
-print(f"\nAccuracy vs NLCD (superclasses): {accuracy:.4f}")
+print(f"\nManual mapping accuracy: {accuracy:.4f}")
 
 CLASS_COLORS = {
     "water": [0, 0, 255],         # blue
