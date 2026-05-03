@@ -292,7 +292,7 @@ CLASS_COLORS = {
     "vegetation": [0, 200, 0],    # green
     "barren": [210, 180, 140],    # tan
     "agriculture": [255, 255, 0], # yellow (optional)
-    "unknown": [0, 0, 0]          # black
+    "ignore": [0, 0, 0]          # black
 }
 
 # Create RGB image
