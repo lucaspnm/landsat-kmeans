@@ -246,21 +246,21 @@ NLCD_GROUPS = {
     11: "water", 
     12: "water",
     
-    21: "developed/open", 
+    21: "developed", 
     22: "developed", 
     23: "developed", 
     24: "developed",
 
     31: "barren",
     
-    41: "forest/vegetation",
-    42: "forest/vegetation", 
-    43: "forest/vegetation",
-    90: "wetland/vegetation", 
-    95: "wetland/vegetation", # wetlands mapped to vegetation
+    41: "vegetation",
+    42: "vegetation", 
+    43: "vegetation",
+    90: "vegetation", 
+    95: "vegetation", # wetlands mapped to vegetation
 
-    52: "shrubland/desert", 
-    71: "shrubland/desert", 
+    52: "desert/shrubland", 
+    71: "desert/shrubland", 
 
     81: "agriculture", 
     82: "agriculture"
@@ -271,7 +271,13 @@ nlcd_flat = nlcd_aligned.reshape(-1)
 nlcd_valid = nlcd_flat[valid_mask]
 nlcd_super = map_nlcd_to_superclass(nlcd_valid)
 
-eval_classes = ["urban - low intensity", "urban", "barren", "vegetation", "agriculture"]
+eval_classes = [
+    "developed",
+    "vegetation",
+    "desert/shrubland",
+    "agriculture",
+    "barren"
+]
 eval_mask = np.isin(nlcd_super, eval_classes)
 
 labels_eval = labels_valid[eval_mask]
@@ -280,11 +286,11 @@ nlcd_eval = nlcd_super[eval_mask]
 cluster_to_class = {}
 
 cluster_to_class = {
-    0: "desert / shrubland / arid terrain",
-    1: "mixed developed / barren / transitional land",
-    2: "vegetation / mountainous vegetation",
-    3: "water or very dark/low-reflectance pixels",
-    4: "agriculture or bright developed/open land",
+    0: "desert/shrubland",
+    1: "developed",
+    2: "vegetation",
+    3: "water",
+    4: "agriculture",
 }
 
 # Convert clusters → predicted classes
@@ -302,11 +308,11 @@ accuracy = np.mean(
 print(f"\nManual mapping accuracy: {accuracy:.4f}")
 
 CLASS_COLORS = {
-    "desert / shrubland / arid terrain": [0, 0, 255],         # blue
-    "mixed developed / barren / transitional land": [255, 0, 0],         # red
-    "vegetation / mountainous vegetation": [0, 200, 0],    # green
-    "water or very dark/low-reflectance pixels": [210, 180, 140],    # tan
-    "agriculture or bright developed/open land": [255, 255, 0], # yellow (optional)
+    "desert/shrubland": [0, 0, 255],         # blue
+    "developed": [255, 0, 0],         # red
+    "vegetation": [0, 200, 0],    # green
+    "water": [210, 180, 140],    # tan
+    "agriculture": [255, 255, 0], # yellow (optional)
     "ignore": [0, 0, 0]          # black
 }
 

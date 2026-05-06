@@ -14,15 +14,29 @@ NLCD_PATH  = "Annual_NLCD_LndCov_2024_CU_C1V1.tif"
 OUTPUT_DIR = "results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# NLCD groups
+# mapping NLCD numbers to label names
 NLCD_GROUPS = {
-    11: "water", 12: "water",
-    21: "urban", 22: "urban", 23: "urban", 24: "urban",
+    11: "water", 
+    12: "water",
+    
+    21: "developed", 
+    22: "developed", 
+    23: "developed", 
+    24: "developed",
+
     31: "barren",
-    41: "vegetation", 42: "vegetation", 43: "vegetation",
-    52: "vegetation", 71: "vegetation", 
-    90: "vegetation", 95: "vegetation", # wetlands mapped to vegetation
-    81: "agriculture", 82: "agriculture"
+    
+    41: "vegetation",
+    42: "vegetation", 
+    43: "vegetation",
+    90: "vegetation", 
+    95: "vegetation", # wetlands mapped to vegetation
+
+    52: "desert/shrubland", 
+    71: "desert/shrubland", 
+
+    81: "agriculture", 
+    82: "agriculture"
 }
 
 CLASS_COLORS = {
