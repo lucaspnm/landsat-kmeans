@@ -40,12 +40,12 @@ NLCD_GROUPS = {
 }
 
 CLASS_COLORS = {
-    "water": [0, 0, 255],
-    "urban": [255, 0, 0],
-    "barren": [210, 180, 140],
-    "vegetation": [0, 200, 0],
-    "agriculture": [255, 255, 0],
-    "ignore": [0, 0, 0],
+    "desert/shrubland": [0, 0, 255],         # blue
+    "developed": [255, 0, 0],         # red
+    "vegetation": [0, 200, 0],    # green
+    "water": [210, 180, 140],    # tan
+    "agriculture": [255, 255, 0], # yellow (optional)
+    "ignore": [0, 0, 0]          # black
 }
 
 # Helpers
@@ -92,7 +92,13 @@ for class_name, color in CLASS_COLORS.items():
     nlcd_rgb[nlcd_super == class_name] = color
 
 # Plot with discrete legend
-legend_classes = ["water", "urban", "barren", "vegetation", "agriculture"]
+legend_classes = [
+    "developed",
+    "vegetation",
+    "desert/shrubland",
+    "agriculture",
+    "barren"
+]
 
 legend_patches = [
     mpatches.Patch(
