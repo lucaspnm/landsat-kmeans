@@ -8,6 +8,18 @@ import rasterio
 from rasterio.warp import reproject, Resampling
 from collections import Counter
 
+# import utility functions
+from landcover_utils import (
+    align_nlcd_to_landsat,
+    read_band,
+    scale_reflectance,
+    normalized_difference,
+    normalize_for_display,
+    save_false_color,
+    save_overlay,
+    map_nlcd_to_superclass      
+)
+
 # Paths and parameters
 GREEN_PATH = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B3.TIF"
 RED_PATH   = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B4.TIF"
@@ -21,80 +33,6 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 K = 5
 MAX_SAMPLES = 20000
 RANDOM_SEED = 0
-
-# Helper functions
-def align_nlcd_to_landsat(nlcd_path, landsat_profile, dst_shape):
-    """
-    Reproject NLCD to match the Landsat grid.
-    Returns aligned NLCD as a NumPy array.
-    """
-    nlcd_aligned = np.zeros(dst_shape, dtype=np.int16)
-
-    with rasterio.open(nlcd_path) as src:
-        reproject(
-            source=rasterio.band(src, 1),
-            destination=nlcd_aligned,
-            src_transform=src.transform,
-            src_crs=src.crs,
-            dst_transform=landsat_profile["transform"],
-            dst_crs=landsat_profile["crs"],
-            resampling=Resampling.nearest
-        )
-
-    return nlcd_aligned
-
-def read_band(path):
-    with rasterio.open(path) as src:
-        band = src.read(1).astype(np.float32)
-        profile = src.profile
-        return band, profile
-
-def scale_reflectance(dn):
-    return dn * 0.0000275 - 0.2
-
-def normalized_difference(a, b, eps=1e-6):
-    denom = a + b
-    out = np.full_like(a, np.nan, dtype=np.float32)
-    valid = np.abs(denom) > eps
-    out[valid] = (a[valid] - b[valid]) / denom[valid]
-    return out
-
-def normalize_for_display(img, clip_min=0.0, clip_max=0.4):
-    img = np.clip(img, clip_min, clip_max)
-    return (img - clip_min) / (clip_max - clip_min)
-
-def save_false_color(nir, red, green):
-    false_color = np.stack([
-        normalize_for_display(nir),
-        normalize_for_display(red),
-        normalize_for_display(green)
-    ], axis=-1)
-
-    plt.figure(figsize=(12, 10))
-    plt.imshow(false_color)
-    plt.title("False Color Composite (NIR, Red, Green)")
-    plt.axis("off")
-    plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "false_color_composite.png"), dpi=300)
-    plt.close()
-
-def save_overlay(false_color, nlcd_aligned, out_path):
-    plt.figure(figsize=(12, 10))
-    plt.imshow(false_color)
-    plt.imshow(nlcd_aligned, cmap="tab20", alpha=0.35)
-    plt.title("NLCD Overlay on Landsat")
-    plt.axis("off")
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=300)
-    plt.close()
-
-def map_nlcd_to_superclass(nlcd_array):
-    mapped = np.zeros_like(nlcd_array, dtype=object)
-
-    for key, val in NLCD_GROUPS.items():
-        mapped[nlcd_array == key] = val
-
-    return mapped
 
 # Load bands
 green, green_profile = read_band(GREEN_PATH)
@@ -269,7 +207,7 @@ NLCD_GROUPS = {
 # Flatten NLCD and align with valid pixels
 nlcd_flat = nlcd_aligned.reshape(-1)
 nlcd_valid = nlcd_flat[valid_mask]
-nlcd_super = map_nlcd_to_superclass(nlcd_valid)
+nlcd_super = map_nlcd_to_superclass(nlcd_valid, NLCD_GROUPS)
 
 eval_classes = [
     "developed",
