@@ -292,6 +292,10 @@ accuracy = np.mean(
 
 print(f"\nManual mapping accuracy: {accuracy:.4f}")
 
+# ------------------------------------------------------------
+# Save final labeled land-cover map
+# ------------------------------------------------------------
+
 CLASS_COLORS = {
     "desert/shrubland": [0, 0, 255],         # blue
     "developed": [255, 0, 0],         # red
