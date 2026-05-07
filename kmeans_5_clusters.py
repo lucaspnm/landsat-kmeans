@@ -237,13 +237,19 @@ NLCD_GROUPS = {
 
 # Flatten NLCD and align with valid pixels
 nlcd_flat = nlcd_aligned.reshape(-1)
+
+# Keep only NLCD pixels corresponding to valid Landsat feature pixels
 nlcd_valid = nlcd_flat[valid_mask]
+
+# Convert detailed NLCD codes to broader superclass labels 
 nlcd_super = map_nlcd_to_superclass(nlcd_valid, NLCD_GROUPS)
 
 # ------------------------------------------------------------
 # Select classes used for quantitative evaluation
 # ------------------------------------------------------------
 
+# Water is excluded from the main accuracy calculation because much of it
+# appears as invalid/background in the current K-means output
 eval_classes = [
     "developed",
     "vegetation",
@@ -251,13 +257,19 @@ eval_classes = [
     "agriculture",
     "barren"
 ]
+
+# Select only pixels whose NLCD superclass is in the evaluation set
 eval_mask = np.isin(nlcd_super, eval_classes)
 
 labels_eval = labels_valid[eval_mask]
 nlcd_eval = nlcd_super[eval_mask]
 
-cluster_to_class = {}
+# ------------------------------------------------------------
+# Manually map K-means clusters to land-cover classes
+# ------------------------------------------------------------
 
+# Cluster numbers are arbitrary, so they must be interpreted manually 
+# by using the cluster map, feature means, and NLCD reference data
 cluster_to_class = {
     0: "desert/shrubland",
     1: "developed",

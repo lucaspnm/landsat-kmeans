@@ -60,8 +60,15 @@ CLASS_COLORS = {
 }
 
 # Align and collapse NLCD
-nlcd_aligned = align_nlcd_to_landsat(NLCD_PATH, GREEN_PATH)
-nlcd_super = map_nlcd_to_superclass(nlcd_aligned)
+green, green_profile = read_band(GREEN_PATH)
+
+nlcd_aligned = align_nlcd_to_landsat(
+    NLCD_PATH,
+    green_profile,
+    dst_shape=green.shape
+)
+
+nlcd_super = map_nlcd_to_superclass(nlcd_aligned, NLCD_GROUPS)
 
 print("Aligned NLCD shape:", nlcd_aligned.shape)
 print("Unique raw NLCD classes:", np.unique(nlcd_aligned))
@@ -72,22 +79,22 @@ nlcd_rgb = np.zeros((nlcd_super.shape[0], nlcd_super.shape[1], 3), dtype=np.uint
 for class_name, color in CLASS_COLORS.items():
     nlcd_rgb[nlcd_super == class_name] = color
 
-# Plot with discrete legend
-legend_classes = [
-    "developed",
-    "vegetation",
-    "desert/shrubland",
-    "agriculture",
-    "barren"
-]
+# Build legend dynamically
+cluster_to_class = {
+    0: "desert/shrubland",
+    1: "developed",
+    2: "vegetation",
+    3: "water",
+    4: "agriculture",
+}
 
-legend_patches = [
-    mpatches.Patch(
-        color=np.array(CLASS_COLORS[class_name]) / 255.0,
-        label=class_name
-    )
-    for class_name in legend_classes
-]
+legend_patches = []
+used_classes = set(cluster_to_class.values())
+
+for class_name in used_classes:
+    color = np.array(CLASS_COLORS[class_name]) / 255.0
+    patch = mpatches.Patch(color=color, label=class_name)
+    legend_patches.append(patch)
 
 plt.figure(figsize=(12, 10))
 plt.imshow(nlcd_rgb)
@@ -138,7 +145,7 @@ unique_classes = unique_classes[unique_classes > 0]  # remove background
 
 # Build legend dynamically
 legend_patches = []
-cmap = plt.cm.get_cmap("tab20")
+cmap = plt.colormaps["tab20"]
 
 for i, cls in enumerate(unique_classes):
     color = cmap(i % 20)  # cycle through tab20 colors
