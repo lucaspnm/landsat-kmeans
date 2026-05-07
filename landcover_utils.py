@@ -147,3 +147,37 @@ def map_nlcd_to_superclass(nlcd_array, nlcd_groups):
         mapped[nlcd_array == key] = val
 
     return mapped
+
+def save_cluster_map(label_image, K, cluster_colors, output_path):
+    """
+    Create a colormap for background + clusters, plot the cluster map, 
+    and save it with a legend.
+    """
+
+    # Create a colormap for background + clusters
+    cmap = ListedColormap(cluster_colors[:K + 1])
+    bounds = np.arange(-1.5, K + 0.5, 1)
+    norm = BoundaryNorm(bounds, cmap.N)
+
+    plt.figure(figsize=(12, 10))
+    img = plt.imshow(label_image, cmap=cmap, norm=norm)
+    plt.title(f"K-means Cluster Map, K = {K}")
+    plt.axis("off")
+
+    # Build legend 
+    legend_patches = [
+        mpatches.Patch(color="black", label="Background / invalid")
+    ]
+
+    for cluster_id in range(K):
+        legend_patches.append(
+            mpatches.Patch(
+                color=cluster_colors[cluster_id + 1], 
+                label=f"Cluster {cluster_id}"
+            )
+        )
+
+    plt.legend(handles=legend_patches, loc="lower right")
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, f"k{K}_cluster_map.png"), dpi=300)
+    plt.close()

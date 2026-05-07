@@ -7,6 +7,17 @@ import matplotlib.patches as mpatches
 import rasterio
 from rasterio.warp import reproject, Resampling
 
+from landcover_utils import (
+    align_nlcd_to_landsat,
+    read_band,
+    scale_reflectance,
+    normalized_difference,
+    normalize_for_display,
+    save_false_color,
+    save_overlay,
+    map_nlcd_to_superclass      
+)
+
 # Paths
 GREEN_PATH = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B3.TIF"
 NLCD_PATH  = "Annual_NLCD_LndCov_2024_CU_C1V1.tif"
@@ -14,7 +25,7 @@ NLCD_PATH  = "Annual_NLCD_LndCov_2024_CU_C1V1.tif"
 OUTPUT_DIR = "results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# mapping NLCD numbers to label names
+# mapping NLCD numbers to label names - 5 superclasses
 NLCD_GROUPS = {
     11: "water", 
     12: "water",
@@ -47,36 +58,6 @@ CLASS_COLORS = {
     "agriculture": [255, 255, 0], # yellow (optional)
     "ignore": [0, 0, 0]          # black
 }
-
-# Helpers
-def align_nlcd_to_landsat(nlcd_path, landsat_path):
-    with rasterio.open(landsat_path) as ref:
-        dst_shape = (ref.height, ref.width)
-        dst_transform = ref.transform
-        dst_crs = ref.crs
-
-    nlcd_aligned = np.zeros(dst_shape, dtype=np.int16)
-
-    with rasterio.open(nlcd_path) as src:
-        reproject(
-            source=rasterio.band(src, 1),
-            destination=nlcd_aligned,
-            src_transform=src.transform,
-            src_crs=src.crs,
-            dst_transform=dst_transform,
-            dst_crs=dst_crs,
-            resampling=Resampling.nearest
-        )
-
-    return nlcd_aligned
-
-def map_nlcd_to_superclass(nlcd_array):
-    mapped = np.full(nlcd_array.shape, "ignore", dtype=object)
-
-    for code, class_name in NLCD_GROUPS.items():
-        mapped[nlcd_array == code] = class_name
-
-    return mapped
 
 # Align and collapse NLCD
 nlcd_aligned = align_nlcd_to_landsat(NLCD_PATH, GREEN_PATH)

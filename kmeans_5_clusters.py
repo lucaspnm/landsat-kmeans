@@ -17,7 +17,8 @@ from landcover_utils import (
     normalize_for_display,
     save_false_color,
     save_overlay,
-    map_nlcd_to_superclass      
+    map_nlcd_to_superclass,
+    save_cluster_map
 )
 
 # Paths and parameters
@@ -34,62 +35,96 @@ K = 5
 MAX_SAMPLES = 20000
 RANDOM_SEED = 0
 
-# Load bands
+# ------------------------------------------------------------
+# Load and preprocess Landsat bands
+# ------------------------------------------------------------
+
+# Read the bands and their profiles for georeferencing
 green, green_profile = read_band(GREEN_PATH)
 red, red_profile = read_band(RED_PATH)
 nir, nir_profile = read_band(NIR_PATH)
 swir1, swir1_profile = read_band(SWIR1_PATH)
 
+# Convert raw Landsat digital numbers to surface reflectance values
 green = scale_reflectance(green)
 red = scale_reflectance(red)
 nir = scale_reflectance(nir)
 swir1 = scale_reflectance(swir1)
 
-# Align NLCD
+# ------------------------------------------------------------
+# Align NLCD to the Landsat image grid
+# ------------------------------------------------------------
+
+# Reproject the NLCD raster so each NLCD pixel corresponds to a Landsat pixel
 nlcd_aligned = align_nlcd_to_landsat(
     NLCD_PATH,
     green_profile,
     dst_shape=green.shape
 )
 
-
 print("Image shape:", green.shape)
 
+# ------------------------------------------------------------
+# Save basic scene visualizations
+# ------------------------------------------------------------
+
+# Save a false color composite of the Landsat bands for visual reference
 save_false_color(nir, red, green)
 
+# Recreate the false color composite for overlaying with NLCD
 false_color = np.stack([
     normalize_for_display(nir),
     normalize_for_display(red),
     normalize_for_display(green)
     ], axis=-1)
 
+# Save an overlay of the aligned NLCD on top of the Landsat false color image
+# This helps visually verify NLCD/Landsat alignment
 save_overlay(false_color, 
              nlcd_aligned, 
              os.path.join(OUTPUT_DIR, "nlcd_overlay.png"))
 
+# ------------------------------------------------------------
+# Compute spectral indices
+# ------------------------------------------------------------
 
-# Compute indices
 ndvi = normalized_difference(nir, red)
 ndwi = normalized_difference(green, nir)
 ndbi = normalized_difference(swir1, nir)
 
-# Build feature matrix
+# ------------------------------------------------------------
+# Build feature matrix for K-means
+# ------------------------------------------------------------
+
+# Stack the raw bands and indices into a 7-layer 3D array (rows, cols, features)
 feature_stack = np.stack([green, red, nir, swir1, ndvi, ndwi, ndbi], axis=-1)
 rows, cols, num_features = feature_stack.shape
 
+# Reshape from image format (rows, cols, features) to 
+# K-means format (pixels, features)
 X = feature_stack.reshape(-1, num_features).astype(np.float32)
 
+# Keep only pixels with finite featture values
 valid_mask = np.all(np.isfinite(X), axis=1)
+
+# Keep only reasonable reflectance values for the raw bands
 raw_valid = np.all((X[:, :4] >= 0.0) & (X[:, :4] <= 1.0), axis=1)
+
+# Keep only valid normalized index values
 index_valid = np.all((X[:, 4:] >= -1.0) & (X[:, 4:] <= 1.0), axis=1)
 
+# Final mask combines all validity checks
 valid_mask = valid_mask & raw_valid & index_valid
 X_valid = X[valid_mask]
 
 print("Total pixels:", X.shape[0])
 print("Valid pixels:", X_valid.shape[0])
 
-# Sample for training
+# ------------------------------------------------------------
+# Sample training pixels
+# ------------------------------------------------------------
+
+# Use a random subset for fitting K-means to speed up training
 rng = np.random.default_rng(RANDOM_SEED)
 
 if X_valid.shape[0] > MAX_SAMPLES:
@@ -102,15 +137,30 @@ print("Training samples:", X_train.shape[0])
 
 feature_names = ["green", "red", "nir", "swir1", "ndvi", "ndwi", "ndbi"]
 
+# ------------------------------------------------------------
+# Run K-means clustering
+# ------------------------------------------------------------
 
-print(f"\nRunning K = 5")
+print(f"\nRunning K = {K}")
 
+# Fit K-means on the sampled training pixels
 kmeans = KMeans(n_clusters=K, random_state=RANDOM_SEED, n_init=10)
 labels_train = kmeans.fit_predict(X_train)
+
+# Predict cluster labels for all valid pixels in the image
 labels_valid = kmeans.predict(X_valid)
 
+# ------------------------------------------------------------
+# Convert 1D cluster labels back into image format
+# ------------------------------------------------------------
+
+# Start with all pixels marked as invalid/background
 label_image = np.full(X.shape[0], -1, dtype=np.int32)
+
+# Fill valid pixels with their predicted cluster labels
 label_image[valid_mask] = labels_valid
+
+# Reshape back to original image dimensions
 label_image = label_image.reshape(rows, cols)
 
 # Save cluster map with legend
@@ -123,32 +173,12 @@ cluster_colors = [
     "tab:orange", # cluster 4 if K=5
 ]
 
-cmap = ListedColormap(cluster_colors[:K + 1])
-bounds = np.arange(-1.5, K + 0.5, 1)
-norm = BoundaryNorm(bounds, cmap.N)
-
-plt.figure(figsize=(12, 10))
-img = plt.imshow(label_image, cmap=cmap, norm=norm)
-plt.title(f"K-means Cluster Map, K = {K}")
-plt.axis("off")
-
-# Build legend 
-legend_patches = [
-    mpatches.Patch(color="black", label="Background / invalid")
-]
-
-for cluster_id in range(K):
-    legend_patches.append(
-        mpatches.Patch(
-            color=cluster_colors[cluster_id + 1], 
-            label=f"Cluster {cluster_id}"
-        )
-    )
-
-plt.legend(handles=legend_patches, loc="lower right")
-plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, f"k{K}_cluster_map.png"), dpi=300)
-plt.close()
+save_cluster_map(
+    label_image,
+    K,
+    cluster_colors,
+    os.path.join(OUTPUT_DIR, f"k{K}_cluster_map.png")
+)
 
 # Save feature-space scatter
 plt.figure(figsize=(8, 6))
@@ -176,10 +206,11 @@ for cluster_id in range(K):
     for name, val in zip(feature_names, cluster_mean):
         print(f"  {name:>6s}: {val: .4f}")
 
+# ------------------------------------------------------------
+# Collapse NLCD classes into broader evaluation classes
+# ------------------------------------------------------------
 
-# Analysis of NLCD classes in each cluster
-
-# mapping NLCD numbers to label names
+# Map detailed NLCD numeric class codes to broader land-cover categories
 NLCD_GROUPS = {
     11: "water", 
     12: "water",
@@ -208,6 +239,10 @@ NLCD_GROUPS = {
 nlcd_flat = nlcd_aligned.reshape(-1)
 nlcd_valid = nlcd_flat[valid_mask]
 nlcd_super = map_nlcd_to_superclass(nlcd_valid, NLCD_GROUPS)
+
+# ------------------------------------------------------------
+# Select classes used for quantitative evaluation
+# ------------------------------------------------------------
 
 eval_classes = [
     "developed",
