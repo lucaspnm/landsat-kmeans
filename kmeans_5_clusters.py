@@ -278,53 +278,43 @@ cluster_to_class = {
     4: "agriculture",
 }
 
-# Convert each valid pixel's cluster ID into a predicted land-cover class
+# Convert clusters → predicted classes
 predicted_classes = np.array([
     cluster_to_class.get(c, "unknown") for c in labels_valid
 ])
 
-# ------------------------------------------------------------
-# Compute accuracy relative to the collapsed NLCD reference map
-# ------------------------------------------------------------
-
 # Only evaluate valid NLCD classes
 valid_eval = np.isin(nlcd_super, eval_classes)
 
-# Compare predicted classes to NLCD superclasses only for evaluated pixels
 accuracy = np.mean(
     predicted_classes[valid_eval] == nlcd_super[valid_eval]
 )
 
 print(f"\nManual mapping accuracy: {accuracy:.4f}")
 
-# ------------------------------------------------------------
-# Save final labeled land-cover map
-# ------------------------------------------------------------
-
-# RGB colors used to display the interpreted land-cover types 
 CLASS_COLORS = {
-    "desert/shrubland": [0, 0, 255],        # blue
-    "developed": [255, 0, 0],               # red
-    "vegetation": [0, 200, 0],              # green
-    "water": [210, 180, 140],               # tan
-    "agriculture": [255, 255, 0],           # yellow (optional)
-    "ignore": [0, 0, 0]                     # black
+    "desert/shrubland": [0, 0, 255],         # blue
+    "developed": [255, 0, 0],         # red
+    "vegetation": [0, 200, 0],    # green
+    "water": [210, 180, 140],    # tan
+    "agriculture": [255, 255, 0], # yellow (optional)
+    "ignore": [0, 0, 0]          # black
 }
 
-# Initialize RGB image
+# Create RGB image
 rgb_image = np.zeros((rows, cols, 3), dtype=np.uint8)
 
-# Color each K-means cluster according to its interpreted land-cover class
+# Fill it
 for cluster_id, class_name in cluster_to_class.items():
     mask = (label_image == cluster_id)
     rgb_image[mask] = CLASS_COLORS[class_name]
 
 plt.figure(figsize=(12, 10))
 plt.imshow(rgb_image)
-plt.title("K-means Land Cover Classification (K=5)")
+plt.title(f"K-means Land Cover Classification (K={K})")
 plt.axis("off")
 
-# Build legend using only classes present in the cluster mapping
+# Build legend dynamically
 legend_patches = []
 used_classes = set(cluster_to_class.values())
 
@@ -335,5 +325,5 @@ for class_name in used_classes:
 
 plt.legend(handles=legend_patches, loc="lower right")
 plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "NLCD_k5_labeled_map.png"), dpi=300)
+plt.savefig(os.path.join(OUTPUT_DIR, f"NLCD_k{K}_labeled_map.png"), dpi=300)
 plt.close()

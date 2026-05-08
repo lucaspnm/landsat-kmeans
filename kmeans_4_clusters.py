@@ -215,24 +215,22 @@ NLCD_GROUPS = {
     11: "water", 
     12: "water",
     
-    21: "developed", 
-    22: "developed", 
-    23: "developed", 
-    24: "developed",
-
-    31: "barren",
+    21: "developed/barren", 
+    22: "developed/barren", 
+    23: "developed/barren", 
+    24: "developed/barren",
+    31: "developed/barren",
     
-    41: "vegetation",
-    42: "vegetation", 
-    43: "vegetation",
-    90: "vegetation", 
-    95: "vegetation", # wetlands mapped to vegetation
+    41: "vegetation/agriculture",
+    42: "vegetation/agriculture", 
+    43: "vegetation/agriculture",
+    90: "vegetation/agriculture", 
+    95: "vegetation/agriculture", # wetlands mapped to vegetation
+    81: "vegetation/agriculture", 
+    82: "vegetation/agriculture",
 
     52: "desert/shrubland", 
-    71: "desert/shrubland", 
-
-    81: "agriculture", 
-    82: "agriculture"
+    71: "desert/shrubland"
 }
 
 # Flatten NLCD and align with valid pixels
@@ -251,11 +249,10 @@ nlcd_super = map_nlcd_to_superclass(nlcd_valid, NLCD_GROUPS)
 # Water is excluded from the main accuracy calculation because much of it
 # appears as invalid/background in the current K-means output
 eval_classes = [
-    "developed",
-    "vegetation",
+    "developed/barren",
+    "vegetation/agriculture",
     "desert/shrubland",
-    "agriculture",
-    "barren"
+    "water"
 ]
 
 # Select only pixels whose NLCD superclass is in the evaluation set
@@ -272,10 +269,9 @@ nlcd_eval = nlcd_super[eval_mask]
 # by using the cluster map, feature means, and NLCD reference data
 cluster_to_class = {
     0: "desert/shrubland",
-    1: "developed",
-    2: "vegetation",
-    3: "water",
-    4: "agriculture",
+    1: "developed/barren",
+    2: "vegetation/agriculture",
+    3: "water"
 }
 
 # Convert each valid pixel's cluster ID into a predicted land-cover class
@@ -303,12 +299,12 @@ print(f"\nManual mapping accuracy: {accuracy:.4f}")
 
 # RGB colors used to display the interpreted land-cover types 
 CLASS_COLORS = {
-    "desert/shrubland": [0, 0, 255],        # blue
-    "developed": [255, 0, 0],               # red
-    "vegetation": [0, 200, 0],              # green
-    "water": [210, 180, 140],               # tan
-    "agriculture": [255, 255, 0],           # yellow (optional)
-    "ignore": [0, 0, 0]                     # black
+    "water": [0, 0, 255],                         # blue
+    "developed/barren": [220, 100, 80],           # reddish brown
+    "vegetation/agriculture": [120, 220, 0],      # yellow-green
+    "desert/shrubland": [210, 180, 140],          # tan
+    "ignore": [0, 0, 0],
+    "unknown": [0, 0, 0]
 }
 
 # Initialize RGB image
@@ -321,7 +317,7 @@ for cluster_id, class_name in cluster_to_class.items():
 
 plt.figure(figsize=(12, 10))
 plt.imshow(rgb_image)
-plt.title("K-means Land Cover Classification (K=5)")
+plt.title(f"K-means Land Cover Classification (K={K})")
 plt.axis("off")
 
 # Build legend using only classes present in the cluster mapping
@@ -335,5 +331,5 @@ for class_name in used_classes:
 
 plt.legend(handles=legend_patches, loc="lower right")
 plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "NLCD_k5_labeled_map.png"), dpi=300)
+plt.savefig(os.path.join(OUTPUT_DIR, f"NLCD_k{K}_labeled_map.png"), dpi=300)
 plt.close()
