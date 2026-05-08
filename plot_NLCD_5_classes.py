@@ -1,4 +1,14 @@
+# --------------------------------------------------------------
 # plot_nlcd_aligned.py
+# --------------------------------------------------------------
+# Purpose:
+#   - Align the NLCD land‑cover raster to a Landsat‑8 green band.
+#   - Collapse the many NLCD categories into a small set of
+#     “super‑classes” for easier visual comparison.
+#   - Produce two PNGs:
+#        1) A colour‑coded map of the collapsed classes (with legend).
+#        2) The original NLCD map (uncollapsed) with a dynamic legend.
+# --------------------------------------------------------------
 
 import os
 import numpy as np
@@ -7,6 +17,7 @@ import matplotlib.patches as mpatches
 import rasterio
 from rasterio.warp import reproject, Resampling
 
+# import helper functions
 from landcover_utils import (
     align_nlcd_to_landsat,
     read_band,
@@ -18,11 +29,12 @@ from landcover_utils import (
     map_nlcd_to_superclass      
 )
 
-# Paths
 GREEN_PATH = "LC08_L2SP_041036_20251005_20251115_02_T1_SR_B3.TIF"
 NLCD_PATH  = "Annual_NLCD_LndCov_2024_CU_C1V1.tif"
 
 OUTPUT_DIR = "results"
+
+# Ensures the output folder exists (creates it if necessary)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # mapping NLCD numbers to label names - 5 superclasses
@@ -50,6 +62,7 @@ NLCD_GROUPS = {
     82: "agriculture"
 }
 
+# Define colormap for the superclasses
 CLASS_COLORS = {
     "desert/shrubland": [0, 0, 255],         # blue
     "developed": [255, 0, 0],         # red
